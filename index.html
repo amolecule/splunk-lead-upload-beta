@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Splunk Lead Upload Converter · Beta</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root { color-scheme: light; --ink:#182230; --muted:#5e6b78; --line:#d9e0e7; --paper:#fff; --wash:#f5f7f9; --red:#e31b54; --green:#087443; --amber:#8a5200; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--wash); color:var(--ink); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif }
+    header { background:#111827; color:#fff; padding:24px max(24px,calc((100vw - 1080px)/2)); border-bottom:4px solid var(--red) }
+    .brand { color:#ff5b80; text-transform:uppercase; letter-spacing:.13em; font-size:12px; font-weight:700 }
+    h1 { font-size:27px; margin:5px 0 4px }
+    header p { color:#c5ccd5; margin:0; max-width:760px }
+    main { max-width:1080px; margin:26px auto 64px; padding:0 22px }
+    .card { background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:22px; margin-bottom:16px; box-shadow:0 1px 2px #1018280a }
+    .card h2 { margin:0 0 14px; font-size:18px }
+    .step { color:var(--red); font-size:12px; font-weight:750; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px }
+    label { display:block; font-weight:650; font-size:13px; margin-bottom:5px }
+    input,select { width:100%; min-height:42px; border:1px solid #aeb9c5; border-radius:7px; padding:8px 10px; color:var(--ink); background:#fff; font:inherit }
+    input[type=file] { padding:9px; background:var(--wash) }
+    input[type=checkbox] { width:18px; min-height:18px; vertical-align:middle; accent-color:var(--red) }
+    .check { display:flex; align-items:center; gap:8px; padding-top:25px }
+    .check label { margin:0 }
+    .hint { color:var(--muted); font-size:12px; margin:5px 0 0 }
+    .privacy { background:#eef6f2; border-left:4px solid var(--green); padding:11px 14px; border-radius:5px; margin-top:14px; font-size:13px }
+    .banner { padding:11px 14px; border-radius:6px; margin:12px 0 0; font-size:13px; display:none }
+    .banner.warn { display:block; background:#fff5e6; color:#65400a; border:1px solid #f0d5aa }
+    .banner.error { display:block; background:#fff0f2; color:#7c1830; border:1px solid #f3bdc8 }
+    .banner.good { display:block; background:#edf8f2; color:#075632; border:1px solid #b6dfc9 }
+    .maprow { display:grid; grid-template-columns:minmax(140px,1fr) minmax(160px,1.4fr); gap:14px; align-items:center; padding:6px 0; border-bottom:1px solid #edf0f3 }
+    .maprow:last-child { border:0 }
+    .maprow label { margin:0 }
+    .required::after { content:" *"; color:var(--red) }
+    .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:12px 0 }
+    .metric { border:1px solid var(--line); border-radius:8px; padding:12px }
+    .metric strong { display:block; font-size:22px }
+    .metric span { color:var(--muted); font-size:12px }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px }
+    button { border:0; border-radius:7px; padding:11px 17px; font:inherit; font-weight:700; cursor:pointer }
+    button.primary { background:var(--red); color:white }
+    button.secondary { background:#e8edf2; color:var(--ink) }
+    button:disabled { opacity:.45; cursor:not-allowed }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; max-height:360px }
+    table { border-collapse:collapse; font-size:12px; width:100%; white-space:nowrap }
+    th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #e9edf1; max-width:220px; overflow:hidden; text-overflow:ellipsis }
+    th { background:#f0f3f6; position:sticky; top:0; z-index:1 }
+    .small { font-size:12px; color:var(--muted) }
+    [hidden] { display:none !important }
+    footer { text-align:center; color:var(--muted); font-size:12px; padding:0 20px 30px }
+    @media(max-width:720px) { .grid,.fields { grid-template-columns:1fr } .summary { grid-template-columns:repeat(2,1fr) } header { padding:20px 22px } main { margin-top:16px } .card { padding:17px } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">Splunk · Beta</div>
+  <h1>Lead Upload Converter</h1>
+  <p>Turn one attendee worksheet into a reviewable Marketo Non-Partner upload CSV.</p>
+</header>
+<main>
+  <section class="card">
+    <div class="step">Step 1</div><h2>Choose the attendee file and worksheet</h2>
+    <label for="file">Excel workbook or CSV</label>
+    <input id="file" type="file" accept=".xlsx,.xls,.csv">
+    <div class="grid" style="margin-top:14px">
+      <div><label for="sheet">Worksheet</label><select id="sheet" disabled><option>Select a workbook first</option></select></div>
+      <div><label for="headerRow">Header row</label><select id="headerRow" disabled></select><p class="hint">Choose the row containing the column names.</p></div>
+      <div><label for="campaignId">Salesforce Campaign ID</label><input id="campaignId" placeholder="701xxxxxxxxxxxxxxx" autocomplete="off"><p class="hint">One active child campaign per file.</p></div>
+    </div>
+    <div class="fields" style="margin-top:14px">
+      <div><label for="campaignType">Salesforce Campaign Type</label><input id="campaignType" placeholder="Exact Salesforce type"></div>
+      <div><label for="campaignStatus">Campaign Member Status</label><input id="campaignStatus" placeholder="e.g. Attended"></div>
+    </div>
+    <div class="privacy"><strong>Privacy:</strong> the workbook is read and converted in this browser tab. The app does not upload or save it. It loads the spreadsheet-reading library from jsDelivr; workbook rows are not sent to that library host.</div>
+    <p class="hint">Beta uses the Non-Partner template schema snapshot (observed 2026-10-01). It does not connect to Salesforce or refresh SharePoint picklists; confirm campaign activity, child status, type, status, and current template values before use.</p>
+    <div id="loadMessage" class="banner"></div>
+  </section>
+
+  <section id="mappingCard" class="card" hidden>
+    <div class="step">Step 2</div><h2>Check the field matches</h2>
+    <p class="small">We matched familiar column names where possible. Confirm the mapping before exporting. Leave a field unmatched if your source does not contain it.</p>
+    <div id="mapFields"></div>
+    <div class="fields" style="margin-top:12px">
+      <div><label for="optIn">Opt-In Flag for all rows</label><select id="optIn"><option value="">Blank — unknown or undecided</option><option value="1">1 — explicit opt-in documented</option><option value="0">0 — explicit opt-out documented</option></select><p class="hint">Attendance is not consent. Select 1 or 0 only when the source documents it.</p></div>
+      <div><label for="excludeRouting">Exclude Routing for all rows</label><select id="excludeRouting"><option value="FALSE">FALSE — normal sales routing</option><option value="TRUE">TRUE — bypass sales routing</option><option value="">Blank — template default</option></select></div>
+    </div>
+    <div id="validation" class="banner"></div>
+  </section>
+
+  <section id="reviewCard" class="card" hidden>
+    <div class="step">Step 3</div><h2>Review the conversion</h2>
+    <div id="metrics" class="summary"></div>
+    <div id="reviewMessage" class="banner"></div>
+    <div class="table-wrap"><table id="preview"></table></div>
+    <div class="actions">
+      <button id="download" class="primary">Download upload CSV</button>
+      <button id="downloadJunk" class="secondary" hidden>Download excluded placeholder rows</button>
+    </div>
+    <p class="hint">This creates a UTF-8 CSV only. Review the file and confirm campaign activity/child status in Salesforce before sending it to Workfront.</p>
+  </section>
+</main>
+<footer>Beta · Non-Partner event attendees · No automatic upload to Workfront, Marketo, Salesforce, or Openprise</footer>
+<script>
+(() => {
+  const OUTPUT = ["Import Type","Import SFDC Campaign Type","Import SFDC Campaign Id","Import SFDC Campaign Status","Exclude Routing","Opt-In Flag","Email Address","Company","First Name","Last Name","Job Title","Country","State or Province","Zip or Postal Code","Phone","Address","Address 2","Mobile Phone","Other Phone","Extension","City","Department","MKT Industry","MKT Employees","Area Of Interest","Subject","Comments"];
+  const MAP = [
+    ["Email Address",true,["email","email address","e-mail","email id"]], ["Company",true,["company","organization","organisation","account"]],
+    ["First Name",true,["first name","firstname","given name"]], ["Last Name",true,["last name","lastname","surname","family name"]],
+    ["Country",true,["country","country/region","country region"]], ["Job Title",false,["job title","title","designation","role"]],
+    ["State or Province",false,["state","province","state or province","region"]], ["Zip or Postal Code",false,["zip","zip code","postal code","postcode"]],
+    ["Phone",false,["phone","telephone","business phone"]], ["Address",false,["address","street","street address"]],
+    ["Address 2",false,["address 2","address line 2","suite"]], ["Mobile Phone",false,["mobile","mobile phone","cell phone"]],
+    ["Other Phone",false,["other phone"]], ["Extension",false,["extension","ext"]], ["City",false,["city","town"]],
+    ["Department",false,["department","dept"]], ["MKT Industry",false,["industry","mkt industry"]], ["MKT Employees",false,["employees","employee size","mkt employees"]],
+    ["Area Of Interest",false,["area of interest","interest"]], ["Subject",false,["subject"]], ["Comments",false,["comments","notes","comment"]]
+  ];
+  const $ = id => document.getElementById(id);
+  let workbook, rows = [], header = [], mapping = {}, headersByRow = [], sourceName = "leads";
+  const norm = v => String(v ?? "").trim();
+  const banner = (el, kind, text) => { el.className = `banner ${kind}`; el.textContent = text; };
+  const slug = s => s.normalize("NFKD").replace(/[^a-zA-Z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,70) || "leads";
+  const aliases = new Set(MAP.flatMap(m=>m[2]));
+  function detectRow(grid) {
+    let best = 0, bestScore = -1;
+    grid.slice(0,30).forEach((row,i)=>{ const vals=row.map(x=>norm(x).toLowerCase()); const score=vals.filter(v=>aliases.has(v)).length; if(score>bestScore){best=i;bestScore=score;} });
+    return best;
+  }
+  function setHeaders() {
+    const sheetName=$("sheet").value;
+    const grid=workbook.Sheets[sheetName] ? XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:"",raw:false}) : [];
+    headersByRow=grid;
+    const guess=detectRow(grid), sel=$("headerRow"); sel.replaceChildren();
+    grid.slice(0,30).forEach((row,i)=>{const o=document.createElement("option");o.value=i;o.textContent=`Row ${i+1}: ${row.map(norm).filter(Boolean).slice(0,5).join(" · ") || "(blank)"}`;sel.append(o);});
+    sel.value=String(guess); sel.disabled=!grid.length; loadRows();
+  }
+  function loadRows() {
+    const idx=Number($("headerRow").value||0), grid=headersByRow;
+    header=(grid[idx]||[]).map((h,i)=>norm(h)||`Column ${i+1}`);
+    while(header.length && /^Column \d+$/.test(header.at(-1))) header.pop();
+    rows=grid.slice(idx+1).map((r,i)=>({sourceRow:idx+i+2,values:header.map((_,j)=>norm(r?.[j]))})).filter(r=>r.values.some(Boolean));
+    buildMapping(); render();
+  }
+  function buildMapping() {
+    const root=$("mapFields");root.replaceChildren(); mapping={};
+    MAP.forEach(([target,required,alts])=>{
+      const row=document.createElement("div");row.className="maprow";
+      const label=document.createElement("label");label.textContent=target; if(required)label.className="required";
+      const sel=document.createElement("select");sel.dataset.target=target;
+      const none=document.createElement("option");none.value="";none.textContent="— Leave blank —";sel.append(none);
+      header.forEach((h,i)=>{const o=document.createElement("option");o.value=String(i);o.textContent=h;sel.append(o);});
+      const ix=header.findIndex(h=>alts.includes(h.trim().toLowerCase())); if(ix>=0)sel.value=String(ix);
+      mapping[target]=sel;sel.addEventListener("change",render);
+      row.append(label,sel);root.append(row);
+    });
+  }
+  function valsFor(row) {
+    const o={}; MAP.forEach(([target])=>{const ix=mapping[target]?.value;o[target]=ix===""||ix===undefined?"":norm(row.values[Number(ix)]);});
+    o["Import Type"]="nonpartner"; o["Import SFDC Campaign Type"]=norm($("campaignType").value); o["Import SFDC Campaign Id"]=norm($("campaignId").value); o["Import SFDC Campaign Status"]=norm($("campaignStatus").value); o["Exclude Routing"]=$("excludeRouting").value; o["Opt-In Flag"]=$("optIn").value;
+    return o;
+  }
+  function classify() {
+    const campaignId=norm($("campaignId").value), badId=!/^701[a-zA-Z0-9]{12}([a-zA-Z0-9]{3})?$/.test(campaignId);
+    const ready=[],junk=[],internal=[]; let invalid=0, duplicates=0, seen=new Set();
+    rows.forEach(row=>{
+      const v=valsFor(row); const e=v["Email Address"].toLowerCase();
+      if(e.endsWith("@splunk.com")||e.endsWith("@cisco.com")){internal.push(row);return;}
+      const all=Object.values(v).join(" ").toLowerCase();
+      if(/(^|[\s,;])(?:test|tbd|unknown|\?|x)(?=$|[\s,;])/.test(all)){junk.push(row);return;}
+      if(e && seen.has(e))duplicates++; if(e)seen.add(e);
+      const miss=MAP.filter(([t,req])=>req&& !norm(v[t])).length; if(miss)invalid++;
+      ready.push({row,v});
+    });
+    return {ready,junk,internal,invalid,duplicates,badId};
+  }
+  function render() {
+    if(!rows.length||!header.length){$("mappingCard").hidden=true;$("reviewCard").hidden=true;return;}
+    $("mappingCard").hidden=false;$("reviewCard").hidden=false;
+    const c=classify();
+    const required=MAP.filter(x=>x[1]);
+    const metricData=[[rows.length,"source rows"],[c.ready.length,"upload rows"],[c.internal.length,"internal emails excluded"],[c.junk.length,"placeholder rows held"]];
+    $("metrics").innerHTML=metricData.map(([n,l])=>`<div class="metric"><strong>${n}</strong><span>${l}</span></div>`).join("");
+    const issues=[];
+    if(c.badId)issues.push("Campaign ID must be 15 or 18 characters and start with 701.");
+    if(!norm($("campaignType").value)||!norm($("campaignStatus").value))issues.push("Enter the exact Salesforce Campaign Type and Campaign Member Status.");
+    if(c.invalid)issues.push(`${c.invalid} upload row(s) are missing one or more required contact fields: ${required.map(x=>x[0]).join(", ")}.`);
+    if(c.ready.length&&c.invalid/c.ready.length>0.5)issues.push("More than half of upload rows are missing required fields; return the source for correction before processing.");
+    if(c.duplicates)issues.push(`${c.duplicates} duplicate email occurrence(s) found. They remain in the CSV for GDC review.`);
+    if(c.internal.length)issues.push(`${c.internal.length} Cisco/Splunk internal email row(s) will be excluded by the documented process rule.`);
+    if(c.junk.length)issues.push(`${c.junk.length} placeholder/junk row(s) are held out of the upload CSV.`);
+    if(rows.length>2000)issues.push("More than 2,000 records: GDC approval is required before processing.");
+    if(norm($("campaignStatus").value).toLowerCase()==="sales follow-up"){
+      issues.push("Sales Follow-Up is only for contacts who explicitly requested immediate follow-up."+(c.ready.length>50?" More than 50 records require GDC escalation.":""));
+    }
+    const missingMap=required.filter(([t])=>mapping[t]?.value==="").map(x=>x[0]);
+    if(missingMap.length)issues.push(`Map these required fields before export: ${missingMap.join(", ")}.`);
+    if($("excludeRouting").value==="TRUE")issues.push("Exclude Routing is TRUE and bypasses sales routing; use only when explicitly confirmed.");
+    if($("optIn").value==="0")issues.push("Opt-Out (0) requires GDC escalation.");
+    if(issues.length)banner($("reviewMessage"),"warn",issues.join(" "));else banner($("reviewMessage"),"good","Required fields are mapped. Review every row and confirm the campaign is active and a child campaign in Salesforce.");
+    const table=$("preview"); const cols=["Source row",...OUTPUT.slice(0,11)];
+    const sample=c.ready.slice(0,12);
+    table.innerHTML=`<thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${sample.map(({row,v})=>`<tr><td>${row.sourceRow}</td>${OUTPUT.slice(0,11).map(h=>`<td title="${esc(v[h]||"")}">${esc(v[h]||"")}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    $("download").disabled=!c.ready.length||c.badId||!norm($("campaignType").value)||!norm($("campaignStatus").value)||!!missingMap.length||(c.ready.length>0&&c.invalid/c.ready.length>0.5);
+    $("downloadJunk").hidden=!c.junk.length;
+  }
+  function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  function csv(rowsOut,cols){const q=x=>{const s=String(x??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};return "\uFEFF"+cols.map(q).join(",")+"\r\n"+rowsOut.map(r=>cols.map(h=>q(r[h])).join(",")).join("\r\n");}
+  function save(content,name){const blob=new Blob([content],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  $("file").addEventListener("change",async e=>{
+    const f=e.target.files?.[0]; if(!f)return; sourceName=f.name.replace(/\.[^.]+$/,"");
+    try {
+      if(!window.XLSX)throw new Error("The spreadsheet reader could not load. Check your internet connection and reload this page.");
+      const data=await f.arrayBuffer(); workbook=XLSX.read(data,{type:"array",cellDates:false});
+      const names=workbook.SheetNames.filter(n=>workbook.Sheets[n]?.['!ref']);
+      if(!names.length)throw new Error("No readable worksheets found.");
+      const s=$("sheet");s.replaceChildren();names.forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent=n;s.append(o);});s.disabled=false;$("headerRow").disabled=false;setHeaders();banner($("loadMessage"),"good",`${names.length} worksheet(s) found. Only the selected sheet will be included.`);
+    } catch(err){banner($("loadMessage"),"error",err.message||"Could not read that file.");$("mappingCard").hidden=true;$("reviewCard").hidden=true;}
+  });
+  $("sheet").addEventListener("change",setHeaders); $("headerRow").addEventListener("change",loadRows);
+  ["campaignId","campaignType","campaignStatus","optIn","excludeRouting"].forEach(id=>$(id).addEventListener("input",render));
+  ["optIn","excludeRouting"].forEach(id=>$(id).addEventListener("change",render));
+  $("download").addEventListener("click",()=>{const c=classify();const cols=OUTPUT;const out=c.ready.map(({v})=>v);save(csv(out,cols),`${slug(sourceName)}_Marketo_Lead_Upload.csv`);});
+  $("downloadJunk").addEventListener("click",()=>{const c=classify();const cols=["Source Row",...header];const out=c.junk.map(r=>({"Source Row":r.sourceRow,...Object.fromEntries(header.map((h,i)=>[h,r.values[i]]))}));save(csv(out,cols),`${slug(sourceName)}_Placeholder_Rows_For_Review.csv`);});
+})();
+</script>
+</body>
+</html>
